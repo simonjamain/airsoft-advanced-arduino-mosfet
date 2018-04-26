@@ -1,0 +1,55 @@
+#include <TM1637.h>
+
+#define DISPLAY_CLK 12
+#define DISPLAY_DIO 11
+
+const int triggerPin = 2;
+const int voltageSensorPin = A0;
+const int motorPin = 10;
+const int FIRESTATE = LOW;
+
+int triggerState;
+float batteryVoltage;
+float directSensorVoltage;
+TM1637 display(DISPLAY_CLK, DISPLAY_DIO);
+
+int STATE;
+
+void setup()
+{
+  
+    pinMode(triggerPin, INPUT_PULLUP);
+    pinMode(motorPin, OUTPUT);
+    Serial.begin(9600);
+    display.init();
+    display.set(BRIGHTEST);
+}
+
+void loop()
+{
+    triggerState = digitalRead(triggerPin);
+    delay(10); // Delay a little bit to improve simulation performance
+    if(triggerState == FIRESTATE)
+    {
+      digitalWrite(motorPin, HIGH);
+      display.displayRaw(0,B01110011);
+      display.displayRaw(1,B01111001);
+      display.displayRaw(2,B00111111);
+      display.displayRaw(3,B01111001);
+      
+    } else {
+      digitalWrite(motorPin, LOW);
+    }
+    Serial.println("triggerState");
+    Serial.println(triggerState);
+  /*
+    directSensorVoltage = ((float)analogRead(voltageSensorPin) / 1024.0) * 5;
+      
+    batteryVoltage = directSensorVoltage / (100.0/(160.0+100.0));
+    
+    Serial.println("------------------");
+    Serial.println(analogRead(voltageSensorPin));
+    Serial.println(directSensorVoltage,2);
+    Serial.println(batteryVoltage,2);*/
+    delay(50);
+}
