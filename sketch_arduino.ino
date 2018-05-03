@@ -29,6 +29,7 @@ Z: B01011011
 #include <TM1637.h>
 #include <Pushbutton.h>
 #include <EEPROM.h>
+#include <Cmd.h>
 
 #define TESTING
 //#define EEPROM_INITIALIZATION
@@ -143,6 +144,10 @@ void enterSTATE_DISPLAYING_VOLTAGE()
 
 void setup()
 {
+  cmdInit(9600);
+
+  cmdAdd("cfg", commandSetConfig);
+
 // START EEPROM INITILIZATION
 #ifdef EEPROM_INITIALIZATION
 #warning "Warning: EEPROM_INITIALIZATION is defined, arduino will overwrite default config on each startup, this is used to store reasonable default config values, it should be used only once and then recompiled without !"
@@ -162,10 +167,7 @@ void setup()
   EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, defaultFiremode2RoundsNumberConfig);
   EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADRESS, defaultFiremode2CycleConfig);
 #endif
-// END EEPROM INITIALIZATION
-#ifdef TESTING
-  Serial.begin(9600);
-#endif
+  // END EEPROM INITIALIZATION
 
   pinMode(MOTOR_PIN, OUTPUT);
   display.init();
@@ -180,7 +182,6 @@ void setup()
   EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADRESS, fireMode1CycleConfig);
   EEPROM.get(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2RoundsNumberConfig);
   EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADRESS, fireMode2CycleConfig);
-  // read settings
 
 #ifdef TESTING
   Serial.println("niveau protection alerte batterie :");
@@ -197,6 +198,7 @@ void setup()
   Serial.println(fireMode2RoundsNumberConfig);
   Serial.println(fireMode2CycleConfig);
 #endif
+  // read settings
 
   enterSTATE_IDLE_HOT();
 }
@@ -298,6 +300,60 @@ void loop()
   default:
     break;
   }
+}
+
+void commandSetConfig(int nbArgs, char **args)
+{
+  if (nbArgs == 3)
+  {
+    if(strcmp(args[1],"vpa") == 0)
+    {
+      voltageProtectionAlertConfig = atof(args[2]);
+      EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, voltageProtectionAlertConfig);
+      serialReturnSuccess();
+    } else if(strcmp(args[1],"vpc") == 0)
+    {
+      voltageProtectionCutoffConfig = atof(args[2]);
+      EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, voltageProtectionCutoffConfig);
+      serialReturnSuccess();
+    } else if(strcmp(args[1],"fm1rn") == 0)
+    {
+      fireMode1RoundsNumberConfig = atoi(args[2]);
+      EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1RoundsNumberConfig);
+      serialReturnSuccess();
+    } else if(strcmp(args[1],"fm2rn") == 0)
+    {
+      fireMode2RoundsNumberConfig = atoi(args[2]);
+      EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2RoundsNumberConfig);
+      serialReturnSuccess();
+    } else if(strcmp(args[1],"fm1c") == 0)
+    {
+      fireMode1CycleConfig = atoi(args[2]);
+      EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADRESS, fireMode1CycleConfig);
+      serialReturnSuccess();
+    } else if(strcmp(args[1],"fm2c") == 0)
+    {
+      fireMode2CycleConfig = atoi(args[2]);
+      EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADRESS, fireMode2CycleConfig);
+      serialReturnSuccess();
+    } else
+    {
+      serialReturnFailure();
+    }
+  } else
+  {
+    serialReturnFailure();
+  }
+}
+
+void serialReturnFailure()
+{
+  Serial.println("KO");
+}
+
+void serialReturnSuccess()
+{
+  Serial.println("OK");
 }
 
 void displayVoltage()
