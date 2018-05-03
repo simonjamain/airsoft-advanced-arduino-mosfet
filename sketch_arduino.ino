@@ -48,15 +48,18 @@ Z: B01011011
 #define STATE_DISPLAYING_VOLTAGE 2
 #define STATE_FIRING 3
 
+#define CURRENT_FIREMODE_1 1
+#define CURRENT_FIREMODE_2 2
+
 #define FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE 0
 #define FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE 1
 #define FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS 2
 
 #define TRIGGER_BUTTON_PIN 2
-#define MODE_BUTTON_PIN 3
-#define TAPPET_PLATE_SENSOR_PIN 4
+#define TAPPET_PLATE_SENSOR_PIN 3
 #define SAFETY_SENSOR_PIN 5
-#define MODE_2_SENSOR_PIN 6
+#define MODE_1_SENSOR_PIN 6
+#define MODE_2_SENSOR_PIN 7
 
 #define MOTOR_PIN 10
 #define VOLTAGE_SENSOR_PIN A0
@@ -66,6 +69,7 @@ Z: B01011011
 #define DISPLAY_GLOBAL_DEBOUNCE_TIMER 300
 
 uint8_t state;
+uint8_t currentFiremode;
 uint8_t currentFiremodeRoundsNumberConfig;
 uint8_t currentFiremodeCycleConfig;
 uint8_t shotsLeft;
@@ -77,7 +81,7 @@ TM1637 display(DISPLAY_CLK, DISPLAY_DIO);
 unsigned long timeOnLastDisplay;
 
 Pushbutton triggerButton(TRIGGER_BUTTON_PIN);
-Pushbutton modeButton(MODE_BUTTON_PIN);
+Pushbutton mode1SensorButton(MODE_1_SENSOR_PIN);
 Pushbutton mode2SensorButton(MODE_2_SENSOR_PIN);
 Pushbutton safetySensorButton(SAFETY_SENSOR_PIN);
 Pushbutton tappetPlateSensorButton(TAPPET_PLATE_SENSOR_PIN);
@@ -87,8 +91,8 @@ float voltageProtectionAlertConfig;
 float voltageProtectionCutoffConfig;
 uint8_t fireMode1RoundsNumberConfig;
 uint8_t fireMode2RoundsNumberConfig;
-uint8_t firemode1CycleConfig;
-uint8_t firemode2CycleConfig;
+uint8_t fireMode1CycleConfig;
+uint8_t fireMode2CycleConfig;
 
 // ENTER STATES
 void enterSTATE_IDLE_HOT()
@@ -113,14 +117,14 @@ void enterSTATE_IDLE_SAFE()
 
 void enterSTATE_FIRING()
 {
-#ifdef TESTING
-  Serial.println("STATE_FIRING");
-#endif
-
   shotsLeft = currentFiremodeRoundsNumberConfig;
 
   if (shotsLeft > 0 || fullAuto)
   {
+#ifdef TESTING
+    Serial.println("STATE_FIRING");
+#endif
+
     digitalWrite(MOTOR_PIN, HIGH);
     state = STATE_FIRING;
   }
@@ -141,7 +145,7 @@ void setup()
 {
 // START EEPROM INITILIZATION
 #ifdef EEPROM_INITIALIZATION
-  #warning "Warning: EEPROM_INITIALIZATION is defined, arduino will overwrite default config on each startup, this is used to store reasonable default config values, it should be used only once and then recompiled without !"
+#warning "Warning: EEPROM_INITIALIZATION is defined, arduino will overwrite default config on each startup, this is used to store reasonable default config values, it should be used only once and then recompiled without !"
 
   float defaultVoltageProtectionAlertConfig = 3.5f;
   float defaultVoltageProtectionCutoffConfig = 3.0f;
@@ -173,9 +177,9 @@ void setup()
   EEPROM.get(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, voltageProtectionAlertConfig);
   EEPROM.get(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, voltageProtectionCutoffConfig);
   EEPROM.get(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1RoundsNumberConfig);
-  EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADRESS, firemode1CycleConfig);
+  EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADRESS, fireMode1CycleConfig);
   EEPROM.get(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2RoundsNumberConfig);
-  EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADRESS, firemode2CycleConfig);
+  EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADRESS, fireMode2CycleConfig);
   // read settings
 
 #ifdef TESTING
@@ -187,11 +191,11 @@ void setup()
 
   Serial.println("mode de tir 1 (roundsNumber, cycleConfig) :");
   Serial.println(fireMode1RoundsNumberConfig);
-  Serial.println(firemode1CycleConfig);
+  Serial.println(fireMode1CycleConfig);
 
   Serial.println("mode de tir 2 (roundsNumber, cycleConfig) :");
   Serial.println(fireMode2RoundsNumberConfig);
-  Serial.println(fireMode1RoundsNumberConfig);
+  Serial.println(fireMode2CycleConfig);
 #endif
 
   enterSTATE_IDLE_HOT();
@@ -209,11 +213,28 @@ void loop()
     {
     case STATE_IDLE_HOT:
       // behavior
-      if (mode2SensorButton.isPressed())
+      if (mode1SensorButton.isPressed() && currentFiremode != CURRENT_FIREMODE_1)
       {
+        currentFiremodeRoundsNumberConfig = fireMode1RoundsNumberConfig;
+        currentFiremodeCycleConfig = fireMode1CycleConfig;
+        currentFiremode = CURRENT_FIREMODE_1;
+
+#ifdef TESTING
+        Serial.println("CURRENT_FIREMODE_1");
+#endif
+      }
+      if (mode2SensorButton.isPressed() && currentFiremode != CURRENT_FIREMODE_2)
+      {
+        currentFiremodeRoundsNumberConfig = fireMode2RoundsNumberConfig;
+        currentFiremodeCycleConfig = fireMode2CycleConfig;
+        currentFiremode = CURRENT_FIREMODE_2;
+
+#ifdef TESTING
+        Serial.println("CURRENT_FIREMODE_2");
+#endif
       }
       // events
-      if (safetySensorButton.getSingleDebouncedPress()) // we want to uncompress the spring and leave firing
+      if (safetySensorButton.isPressed()) // we want to uncompress the spring and leave firing
       {
         enterSTATE_IDLE_SAFE();
       }
@@ -226,7 +247,7 @@ void loop()
     case STATE_IDLE_SAFE:
       // behavior
       // events
-      if (safetySensorButton.getSingleDebouncedRelease()) // we want to uncompress the spring and leave firing
+      if (!safetySensorButton.isPressed()) // we want to uncompress the spring and leave firing
       {
         if (cocked == false)
         {
