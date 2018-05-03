@@ -31,6 +31,7 @@ Z: B01011011
 #include <EEPROM.h>
 
 #define TESTING
+//#define EEPROM_INITIALIZATION
 
 #define DISPLAY_CLK 12
 #define DISPLAY_DIO 11
@@ -42,8 +43,8 @@ Z: B01011011
 #define EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS 10
 #define EEPROM_FIREMODE_2_CYCLE_ADRESS 11
 
-#define STATE_HOT 0
-#define STATE_SAFE 1
+#define STATE_IDLE_HOT 0
+#define STATE_IDLE_SAFE 1
 #define STATE_DISPLAYING_VOLTAGE 2
 #define STATE_FIRING 3
 
@@ -84,28 +85,30 @@ Pushbutton tappetPlateSensorButton(TAPPET_PLATE_SENSOR_PIN);
 //config variables
 float voltageProtectionAlertConfig;
 float voltageProtectionCutoffConfig;
-uint8_t fireMode1Config;
-uint8_t fireMode2Config;
+uint8_t fireMode1RoundsNumberConfig;
+uint8_t fireMode2RoundsNumberConfig;
+uint8_t firemode1CycleConfig;
+uint8_t firemode2CycleConfig;
 
 // ENTER STATES
-void enterSTATE_HOT()
+void enterSTATE_IDLE_HOT()
 {
 #ifdef TESTING
-  Serial.println("STATE_HOT");
+  Serial.println("STATE_IDLE_HOT");
 #endif
 
   display.displayRaw((const uint8_t[]){B01110110, B00111111, B01111000, B00000000});
-  state = STATE_HOT;
+  state = STATE_IDLE_HOT;
 }
 
-void enterSTATE_SAFE()
+void enterSTATE_IDLE_SAFE()
 {
 #ifdef TESTING
-  Serial.println("STATE_SAFE");
+  Serial.println("STATE_IDLE_SAFE");
 #endif
 
   display.displayRaw((const uint8_t[]){B01101101, B01110111, B01110001, B01111001});
-  state = STATE_SAFE;
+  state = STATE_IDLE_SAFE;
 }
 
 void enterSTATE_FIRING()
@@ -132,26 +135,30 @@ void enterSTATE_DISPLAYING_VOLTAGE()
   displayVoltage();
   state = STATE_DISPLAYING_VOLTAGE;
 }
-  // END ENTER STATES
+// END ENTER STATES
 
-// START EEPROM INITILIZATION
-#ifdef EEPROM_INITIALIZATION
-float defaultVoltageProtectionAlertConfig 3.5f float defaultVoltageProtectionCutoffConfig 3.0f uint8_t defaultFiremode1RoundsNumberConfig 1 uint8_t defaultFiremode1CycleConfig FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE
-    uint8_t defaultFiremode2RoundsNumberConfig 0 uint8_t defaultFiremode2CycleConfig FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE //no effect in full auto
-#endif
-
-#ifdef EEPROM_INITIALIZATION
-EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, voltageProtectionAlertConfig);
-EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, voltageProtectionCutoffConfig);
-EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1Config);
-EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADRESS, defaultFiremode1CycleConfig);
-EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2Config);
-EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADRESS, defaultFiremode2CycleConfig);
-#endif
-// END EEPROM INITIALIZATION
 void setup()
 {
+// START EEPROM INITILIZATION
+#ifdef EEPROM_INITIALIZATION
+  #warning "Warning: EEPROM_INITIALIZATION is defined, arduino will overwrite default config on each startup, this is used to store reasonable default config values, it should be used only once and then recompiled without !"
 
+  float defaultVoltageProtectionAlertConfig = 3.5f;
+  float defaultVoltageProtectionCutoffConfig = 3.0f;
+  uint8_t defaultFiremode1RoundsNumberConfig = 1;
+  uint8_t defaultFiremode1CycleConfig = FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE;
+
+  uint8_t defaultFiremode2RoundsNumberConfig = 0;
+  uint8_t defaultFiremode2CycleConfig = FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE; //no effect in full auto
+
+  EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, defaultVoltageProtectionAlertConfig);
+  EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, defaultVoltageProtectionCutoffConfig);
+  EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, defaultFiremode1RoundsNumberConfig);
+  EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADRESS, defaultFiremode1CycleConfig);
+  EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, defaultFiremode2RoundsNumberConfig);
+  EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADRESS, defaultFiremode2CycleConfig);
+#endif
+// END EEPROM INITIALIZATION
 #ifdef TESTING
   Serial.begin(9600);
 #endif
@@ -165,10 +172,10 @@ void setup()
   // read settings
   EEPROM.get(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, voltageProtectionAlertConfig);
   EEPROM.get(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, voltageProtectionCutoffConfig);
-  EEPROM.get(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1Config);
-  EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADRESS, defaultFiremode1CycleConfig);
-  EEPROM.get(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2Config);
-  EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADRESS, defaultFiremode2CycleConfig);
+  EEPROM.get(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1RoundsNumberConfig);
+  EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADRESS, firemode1CycleConfig);
+  EEPROM.get(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2RoundsNumberConfig);
+  EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADRESS, firemode2CycleConfig);
   // read settings
 
 #ifdef TESTING
@@ -178,49 +185,60 @@ void setup()
   Serial.println("niveau protection coupure batterie :");
   Serial.println(voltageProtectionCutoffConfig);
 
-  Serial.println("mode de tir 1 :");
-  Serial.println(fireMode1Config);
+  Serial.println("mode de tir 1 (roundsNumber, cycleConfig) :");
+  Serial.println(fireMode1RoundsNumberConfig);
+  Serial.println(firemode1CycleConfig);
 
-  Serial.println("mode de tir 2 :");
-  Serial.println(fireMode2Config);
+  Serial.println("mode de tir 2 (roundsNumber, cycleConfig) :");
+  Serial.println(fireMode2RoundsNumberConfig);
+  Serial.println(fireMode1RoundsNumberConfig);
 #endif
 
-  enterSTATE_HOT();
+  enterSTATE_IDLE_HOT();
 }
 
 void loop()
 {
   switch (state)
   {
-  case STATE_HOT:
-    // behavior
-    if (mode2SensorButton.isPressed())
-    {
-    }
-    // events
-    if (safetySensorButton.getSingleDebouncedPress()) // we want to uncompress the spring and leave firing
-    {
-      enterSTATE_SAFE();
-    }
-    if (triggerButton.getSingleDebouncedPress())
-    {
-      enterSTATE_FIRING();
-    }
-    break;
 
-  case STATE_SAFE:
-    // behavior
-    // events
-    if (safetySensorButton.getSingleDebouncedRelease()) // we want to uncompress the spring and leave firing
+  case STATE_IDLE_HOT:
+  case STATE_IDLE_SAFE:
+
+    switch (state)
     {
-      if (cocked == false)
+    case STATE_IDLE_HOT:
+      // behavior
+      if (mode2SensorButton.isPressed())
       {
-        digitalWrite(MOTOR_PIN, HIGH);
-        tappetPlateSensorButton.waitForPress();
-        digitalWrite(MOTOR_PIN, LOW);
       }
-      enterSTATE_HOT();
+      // events
+      if (safetySensorButton.getSingleDebouncedPress()) // we want to uncompress the spring and leave firing
+      {
+        enterSTATE_IDLE_SAFE();
+      }
+      if (triggerButton.getSingleDebouncedPress())
+      {
+        enterSTATE_FIRING();
+      }
+      break;
+
+    case STATE_IDLE_SAFE:
+      // behavior
+      // events
+      if (safetySensorButton.getSingleDebouncedRelease()) // we want to uncompress the spring and leave firing
+      {
+        if (cocked == false)
+        {
+          digitalWrite(MOTOR_PIN, HIGH);
+          tappetPlateSensorButton.waitForPress();
+          digitalWrite(MOTOR_PIN, LOW);
+        }
+        enterSTATE_IDLE_HOT();
+      }
+      break;
     }
+
     break;
 
   case STATE_FIRING:
@@ -237,7 +255,7 @@ void loop()
       if (safetySensorButton.isPressed()) // we want to uncompress the spring and leave firing
       {
         digitalWrite(MOTOR_PIN, LOW);
-        enterSTATE_SAFE();
+        enterSTATE_IDLE_SAFE();
       }
       else // we want to precock the piston
       {
@@ -246,12 +264,10 @@ void loop()
         if (
             !(
                 (triggerButton.isPressed() && (fullAuto || currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS)) ||
-                (shotsLeft > 0 && (currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE || currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS))
-             )
-           )
+                (shotsLeft > 0 && (currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE || currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS))))
         {
           digitalWrite(MOTOR_PIN, LOW);
-          enterSTATE_HOT();
+          enterSTATE_IDLE_HOT();
         }
       }
     }
