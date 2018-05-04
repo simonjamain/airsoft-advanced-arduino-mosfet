@@ -310,9 +310,25 @@ void commandTestingMode(int nbArgs, char **args)
 {
   if (nbArgs == 1)
   {
-    serialReturnSuccess();
+    Serial.print("voltage: ");
+    Serial.println(getCurrentVoltage());
+
+    Serial.print("trigger button: ");
+    Serial.println(triggerButton.isPressed());
+
     Serial.print("tappet plate sensor: ");
     Serial.println(tappetPlateSensorButton.isPressed());
+
+    Serial.print("safety Sensor: ");
+    Serial.println(safetySensorButton.isPressed());
+
+    Serial.print("mode 1 Sensor: ");
+    Serial.println(mode1SensorButton.isPressed());
+
+    Serial.print("mode 2 Sensor: ");
+    Serial.println(mode2SensorButton.isPressed());
+
+    serialReturnSuccess();
   } else
   {
     serialReturnFailure();
@@ -375,7 +391,12 @@ void serialReturnSuccess()
 
 void displayVoltage()
 {
-  display.displayDecimal((((float)analogRead(VOLTAGE_SENSOR_PIN) / 1024.0) * 5) / (100.0 / (160.0 + 100.0)) * VOLTAGE_CORRECTION_FACTOR, 2);
+  display.displayDecimal(getCurrentVoltage(), 2);
+}
+
+float getCurrentVoltage()
+{
+  return (((float)analogRead(VOLTAGE_SENSOR_PIN) / 1024.0) * 5) / (100.0 / (160.0 + 100.0)) * VOLTAGE_CORRECTION_FACTOR;
 }
 
 boolean updateDisplay()
