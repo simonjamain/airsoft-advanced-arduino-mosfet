@@ -70,6 +70,7 @@ Z: B01011011
 #define DISPLAY_GLOBAL_DEBOUNCE_TIMER 300
 
 uint8_t state;
+boolean eventTestingMode;
 uint8_t currentFiremode;
 uint8_t currentFiremodeRoundsNumberConfig;
 uint8_t currentFiremodeCycleConfig;
@@ -85,7 +86,7 @@ Pushbutton triggerButton(TRIGGER_BUTTON_PIN);
 Pushbutton mode1SensorButton(MODE_1_SENSOR_PIN);
 Pushbutton mode2SensorButton(MODE_2_SENSOR_PIN);
 Pushbutton safetySensorButton(SAFETY_SENSOR_PIN);
-Pushbutton tappetPlateSensorButton(TAPPET_PLATE_SENSOR_PIN);
+Pushbutton tappetPlateSensorButton(TAPPET_PLATE_SENSOR_PIN, PULL_UP_ENABLED, DEFAULT_STATE_LOW);
 
 //config variables
 float voltageProtectionAlertConfig;
@@ -147,6 +148,7 @@ void setup()
   cmdInit(9600);
 
   cmdAdd("cfg", commandSetConfig);
+  cmdAdd("testing", commandTestingMode);
 
 // START EEPROM INITILIZATION
 #ifdef EEPROM_INITIALIZATION
@@ -301,6 +303,19 @@ void loop()
 
   default:
     break;
+  }
+}
+
+void commandTestingMode(int nbArgs, char **args)
+{
+  if (nbArgs == 1)
+  {
+    serialReturnSuccess();
+    Serial.print("tappet plate sensor: ");
+    Serial.println(tappetPlateSensorButton.isPressed());
+  } else
+  {
+    serialReturnFailure();
   }
 }
 
