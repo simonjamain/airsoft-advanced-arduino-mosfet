@@ -72,8 +72,8 @@ Z: B01011011
 uint8_t state;
 boolean eventTestingMode;
 uint8_t currentFiremode;
-uint8_t currentFiremodeRoundsNumberConfig;
-uint8_t currentFiremodeCycleConfig;
+uint8_t* currentFiremodeRoundsNumberConfig;
+uint8_t* currentFiremodeCycleConfig;
 uint8_t shotsLeft;
 boolean fullAuto;
 boolean cocked;
@@ -119,7 +119,7 @@ void enterSTATE_IDLE_SAFE()
 
 void enterSTATE_FIRING()
 {
-  shotsLeft = currentFiremodeRoundsNumberConfig;
+  shotsLeft = *currentFiremodeRoundsNumberConfig;
 
   if (shotsLeft > 0 || fullAuto)
   {
@@ -221,8 +221,8 @@ void loop()
       // behavior
       if (mode1SensorButton.isPressed() && currentFiremode != CURRENT_FIREMODE_1)
       {
-        currentFiremodeRoundsNumberConfig = fireMode1RoundsNumberConfig;
-        currentFiremodeCycleConfig = fireMode1CycleConfig;
+        currentFiremodeRoundsNumberConfig = &fireMode1RoundsNumberConfig;
+        currentFiremodeCycleConfig = &fireMode1CycleConfig;
         currentFiremode = CURRENT_FIREMODE_1;
 
 #ifdef TESTING
@@ -231,8 +231,8 @@ void loop()
       }
       if (mode2SensorButton.isPressed() && currentFiremode != CURRENT_FIREMODE_2)
       {
-        currentFiremodeRoundsNumberConfig = fireMode2RoundsNumberConfig;
-        currentFiremodeCycleConfig = fireMode2CycleConfig;
+        currentFiremodeRoundsNumberConfig = &fireMode2RoundsNumberConfig;
+        currentFiremodeCycleConfig = &fireMode2CycleConfig;
         currentFiremode = CURRENT_FIREMODE_2;
 
 #ifdef TESTING
@@ -290,8 +290,8 @@ void loop()
         cocked = true;
         if (
             !(
-                (triggerButton.isPressed() && (fullAuto || currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS)) ||
-                (shotsLeft > 0 && (currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE || currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS))))
+                (triggerButton.isPressed() && (fullAuto || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS)) ||
+                (shotsLeft > 0 && (*currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS))))
         {
           digitalWrite(MOTOR_PIN, LOW);
           enterSTATE_IDLE_HOT();
