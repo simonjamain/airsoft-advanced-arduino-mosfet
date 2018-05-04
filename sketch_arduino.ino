@@ -200,7 +200,7 @@ void setup()
 #endif
   // read settings
 
-  enterSTATE_IDLE_HOT();
+  enterSTATE_IDLE_SAFE();
 }
 
 void loop()
@@ -210,6 +210,8 @@ void loop()
 
   case STATE_IDLE_HOT:
   case STATE_IDLE_SAFE:
+
+    cmdPoll();
 
     switch (state)
     {
