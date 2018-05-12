@@ -65,10 +65,12 @@ Z: B01011011
 #define CURRENT_FIREMODE_SAFE 3
 #endif
 
+#define DISPLAYMODE_FIREMODE 0
+#define DISPLAYMODE_VOLTAGE 1
+
 #define FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE 0
 #define FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE 1
 #define FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS 2
-
 
 #define TRIGGER_BUTTON_PIN 2
 #define TAPPET_PLATE_SENSOR_PIN 3
@@ -76,11 +78,12 @@ Z: B01011011
 #ifdef MULTIMODE_BUTTON
 #define MULTIMODE_BUTTON_PIN 5
 #else
-#define SAFETY_SENSOR_PIN 
-#define MODE_1_SENSOR_PIN 
-#define MODE_2_SENSOR_PIN 
+#define SAFETY_SENSOR_PIN
+#define MODE_1_SENSOR_PIN
+#define MODE_2_SENSOR_PIN
 #endif
 
+#define DISPLAYMODE_BUTTON_PIN 9
 #define DISPLAY_DIO_PIN 6
 #define DISPLAY_CLK_PIN 7
 #define BLUETOOTH_RX_PIN 11
@@ -95,6 +98,7 @@ Z: B01011011
 #define PRECOCK_DELAY 40
 
 uint8_t state;
+uint8_t displaymode;
 boolean eventTestingMode;
 uint8_t currentFiremode;
 uint8_t *currentFiremodeRoundsNumberConfig;
@@ -108,6 +112,8 @@ TM1637 display(DISPLAY_CLK_PIN, DISPLAY_DIO_PIN);
 unsigned long timeOnLastDisplay;
 
 Pushbutton triggerButton(TRIGGER_BUTTON_PIN);
+Pushbutton displaymodeButton(DISPLAYMODE_BUTTON_PIN);
+
 #ifdef MULTIMODE_BUTTON
 Pushbutton multimodeButton(MULTIMODE_BUTTON_PIN);
 #else
@@ -141,7 +147,7 @@ void enterSTATE_IDLE_SAFE()
   Serial.println("STATE_IDLE_SAFE");
 #endif
 
-  if(triggerButton.isPressed())//uncock the piston
+  if (triggerButton.isPressed()) //uncock the piston
   {
     digitalWrite(MOTOR_PIN, HIGH);
     tappetPlateSensorButton.waitForPress();
@@ -149,12 +155,13 @@ void enterSTATE_IDLE_SAFE()
     digitalWrite(MOTOR_PIN, LOW);
   }
 
-  display.displayRaw((const uint8_t[]){B01101101, B01110111, B01110001, B01111001});
   state = STATE_IDLE_SAFE;
 
 #ifdef MULTIMODE_BUTTON
   currentFiremode = CURRENT_FIREMODE_SAFE;
 #endif
+
+  displayFiremodeIf();
 }
 
 void enterSTATE_FIRING()
@@ -184,17 +191,16 @@ void enterSTATE_DISPLAYING_VOLTAGE()
 // END ENTER STATES
 
 #ifdef USE_SOFTWARE_SERIAL
-  SoftwareSerial hc06(BLUETOOTH_RX_PIN, BLUETOOTH_TX_PIN);
-  #endif
+SoftwareSerial hc06(BLUETOOTH_RX_PIN, BLUETOOTH_TX_PIN);
+#endif
 
 void setup()
 {
-  #ifdef USE_SOFTWARE_SERIAL
+#ifdef USE_SOFTWARE_SERIAL
   cmdInit(9600, &hc06);
-  #else
+#else
   cmdInit(9600);
-  #endif
-  
+#endif
 
   cmdAdd("cfg", commandSetConfig);
   cmdAdd("testing", commandTestingMode);
@@ -256,12 +262,29 @@ void setup()
 
 void loop()
 {
+
+  displayVoltageIf();
+
   switch (state)
   {
 
   case STATE_IDLE_HOT:
   case STATE_IDLE_SAFE:
     cmdPoll();
+
+    if (displaymodeButton.getSingleDebouncedPress())
+    {
+      switch (displaymode)
+      {
+      case DISPLAYMODE_FIREMODE:
+        displaymode = DISPLAYMODE_VOLTAGE;
+        break;
+      case DISPLAYMODE_VOLTAGE:
+        displaymode = DISPLAYMODE_FIREMODE;
+        displayFiremode();
+        break;
+      }
+    }
 
     switch (state)
     {
@@ -278,8 +301,7 @@ void loop()
         currentFiremodeCycleConfig = &fireMode1CycleConfig;
         currentFiremode = CURRENT_FIREMODE_1;
 
-        display.displayRaw((const uint8_t[]){B00010101, B00000000, B00110000, B00000000});
-
+        displayFiremode();
 #ifdef TESTING
         Serial.println("CURRENT_FIREMODE_1");
 #endif
@@ -295,7 +317,7 @@ void loop()
         currentFiremodeCycleConfig = &fireMode2CycleConfig;
         currentFiremode = CURRENT_FIREMODE_2;
 
-        display.displayRaw((const uint8_t[]){B00010101, B00000000, B01011011, B00000000});
+        displayFiremodeIf();
 
 #ifdef TESTING
         Serial.println("CURRENT_FIREMODE_2");
@@ -334,7 +356,8 @@ void loop()
           delay(PRECOCK_DELAY);
           digitalWrite(MOTOR_PIN, LOW);
           cocked = true;
-        }*/ // TOO DANGEROUS
+        }*/
+        // TOO DANGEROUS
         enterSTATE_IDLE_HOT();
       }
       break;
@@ -354,13 +377,13 @@ void loop()
       //TODO : remove one BB from magazine
 
 #ifdef MULTIMODE_BUTTON
-      if (multimodeButton.isPressed() && currentFiremode == CURRENT_FIREMODE_2) 
+      if (multimodeButton.isPressed() && currentFiremode == CURRENT_FIREMODE_2)
       {
         digitalWrite(MOTOR_PIN, LOW);
         enterSTATE_IDLE_SAFE();
       }
 #else
-      if (safetySensorButton.isPressed()) 
+      if (safetySensorButton.isPressed())
       {
         digitalWrite(MOTOR_PIN, LOW);
         enterSTATE_IDLE_SAFE();
@@ -368,15 +391,14 @@ void loop()
 #endif
       else // we want to precock the piston
       {
-        while(tappetPlateSensorButton.getSingleDebouncedPress())
+        while (tappetPlateSensorButton.getSingleDebouncedPress())
         {
-
         }
         //tappetPlateSensorButton.waitForPress();
         cocked = true;
         if (
             !(
-                (triggerButton.isPressed() && (fullAuto || (shotsLeft > 0 && *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE) || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS)) || 
+                (triggerButton.isPressed() && (fullAuto || (shotsLeft > 0 && *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE) || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS)) ||
                 (shotsLeft > 0 && (*currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS))))
         {
           delay(PRECOCK_DELAY);
@@ -489,9 +511,44 @@ void serialReturnSuccess()
   SERIAL_OBJECT.println("OK");
 }
 
+void displayVoltageIf()
+{
+  if (displaymode == DISPLAYMODE_VOLTAGE)
+  {
+    if (updateDisplay())
+    {
+      displayVoltage();
+    }
+  }
+}
 void displayVoltage()
 {
   display.displayDecimal(getCurrentVoltage(), 2);
+}
+
+void displayFiremodeIf()
+{
+
+  if (displaymode == DISPLAYMODE_FIREMODE)
+  {
+    displayFiremode();
+  }
+}
+
+void displayFiremode()
+{
+  switch (currentFiremode)
+  {
+  case CURRENT_FIREMODE_1:
+    display.displayRaw((const uint8_t[]){B00010101, B00000000, B00110000, B00000000});
+    break;
+  case CURRENT_FIREMODE_2:
+    display.displayRaw((const uint8_t[]){B00010101, B00000000, B01011011, B00000000});
+    break;
+  case CURRENT_FIREMODE_SAFE:
+    display.displayRaw((const uint8_t[]){B01101101, B01110111, B01110001, B01111001});
+    break;
+  }
 }
 
 float getCurrentVoltage()
