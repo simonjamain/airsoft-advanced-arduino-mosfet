@@ -45,14 +45,14 @@ Z: B01011011
 #define MULTIMODE_BUTTON
 //#define EEPROM_INITIALIZATION
 
-#define EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS 0
-#define EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS 4
-#define EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS 8
-#define EEPROM_FIREMODE_1_CYCLE_ADRESS 9
-#define EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS 10
-#define EEPROM_FIREMODE_2_CYCLE_ADRESS 11
-#define EEPROM_PRECOCK_AFFINE_OFFSET_VOLTAGE 12
-#define EEPROM_PRECOK_AFFINE_SLOPE 16
+#define EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADDRESS 0
+#define EEPROM_VOLTAGE_PROTECTION_ALERT_ADDRESS 4
+#define EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADDRESS 8
+#define EEPROM_FIREMODE_1_CYCLE_ADDRESS 9
+#define EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADDRESS 10
+#define EEPROM_FIREMODE_2_CYCLE_ADDRESS 11
+#define EEPROM_PRECOCK_AFFINE_OFFSET_MS_ADDRESS 12
+#define EEPROM_PRECOK_AFFINE_SLOPE_ADDRESS 16
 
 #define STATE_IDLE_HOT 0
 #define STATE_IDLE_SAFE 1
@@ -106,6 +106,7 @@ uint8_t *currentFiremodeCycleConfig;
 uint8_t shotsLeft;
 boolean fullAuto;
 boolean cocked;
+uint8_t precockAffineOffsetMs;
 
 TM1637 display(DISPLAY_CLK_PIN, DISPLAY_DIO_PIN);
 
@@ -149,10 +150,7 @@ void enterSTATE_IDLE_SAFE()
 
   if (triggerButton.isPressed()) //uncock the piston
   {
-    digitalWrite(MOTOR_PIN, HIGH);
-    tappetPlateSensorButton.waitForPress();
-    tappetPlateSensorButton.waitForRelease();
-    digitalWrite(MOTOR_PIN, LOW);
+    uncock();
   }
 
   state = STATE_IDLE_SAFE;
@@ -204,6 +202,7 @@ void setup()
 
   cmdAdd("cfg", commandSetConfig);
   cmdAdd("testing", commandTestingMode);
+  cmdAdd("uncock", commandUncock);
 
 // START EEPROM INITILIZATION
 #ifdef EEPROM_INITIALIZATION
@@ -217,12 +216,15 @@ void setup()
   uint8_t defaultFiremode2RoundsNumberConfig = 0;
   uint8_t defaultFiremode2CycleConfig = FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE; //no effect in full auto
 
-  EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, defaultVoltageProtectionAlertConfig);
-  EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, defaultVoltageProtectionCutoffConfig);
-  EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, defaultFiremode1RoundsNumberConfig);
-  EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADRESS, defaultFiremode1CycleConfig);
-  EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, defaultFiremode2RoundsNumberConfig);
-  EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADRESS, defaultFiremode2CycleConfig);
+  uint8_t defaultPrecockAffineOffsetMs = 40;
+
+  EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADDRESS, defaultVoltageProtectionAlertConfig);
+  EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADDRESS, defaultVoltageProtectionCutoffConfig);
+  EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADDRESS, defaultFiremode1RoundsNumberConfig);
+  EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADDRESS, defaultFiremode1CycleConfig);
+  EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADDRESS, defaultFiremode2RoundsNumberConfig);
+  EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADDRESS, defaultFiremode2CycleConfig);
+  EEPROM.put(EEPROM_PRECOCK_AFFINE_OFFSET_MS_ADDRESS, defaultPrecockAffineOffsetMs);
 #endif
   // END EEPROM INITIALIZATION
 
@@ -233,12 +235,13 @@ void setup()
   cocked = false;
 
   // read settings
-  EEPROM.get(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, voltageProtectionAlertConfig);
-  EEPROM.get(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, voltageProtectionCutoffConfig);
-  EEPROM.get(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1RoundsNumberConfig);
-  EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADRESS, fireMode1CycleConfig);
-  EEPROM.get(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2RoundsNumberConfig);
-  EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADRESS, fireMode2CycleConfig);
+  EEPROM.get(EEPROM_VOLTAGE_PROTECTION_ALERT_ADDRESS, voltageProtectionAlertConfig);
+  EEPROM.get(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADDRESS, voltageProtectionCutoffConfig);
+  EEPROM.get(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADDRESS, fireMode1RoundsNumberConfig);
+  EEPROM.get(EEPROM_FIREMODE_1_CYCLE_ADDRESS, fireMode1CycleConfig);
+  EEPROM.get(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADDRESS, fireMode2RoundsNumberConfig);
+  EEPROM.get(EEPROM_FIREMODE_2_CYCLE_ADDRESS, fireMode2CycleConfig);
+  EEPROM.get(EEPROM_PRECOCK_AFFINE_OFFSET_MS_ADDRESS, precockAffineOffsetMs);
 
 #ifdef TESTING
   Serial.println("niveau protection alerte batterie :");
@@ -401,7 +404,7 @@ void loop()
                 (triggerButton.isPressed() && (fullAuto || (shotsLeft > 0 && *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE) || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS)) ||
                 (shotsLeft > 0 && (*currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE || *currentFiremodeCycleConfig == FIREMODE_CYCLE_CONFIG_CONTINUE_ON_RELEASE_UNTIL_END_OF_CYCLE_AND_KEEP_ON_PRESS))))
         {
-          delay(PRECOCK_DELAY);
+          delay(precockAffineOffsetMs);
           digitalWrite(MOTOR_PIN, LOW);
           enterSTATE_IDLE_HOT();
         }
@@ -421,6 +424,9 @@ void commandTestingMode(int nbArgs, char **args)
   {
     SERIAL_OBJECT.print("voltage: ");
     SERIAL_OBJECT.println(getCurrentVoltage());
+    
+    SERIAL_OBJECT.print("precock delay: ");
+    SERIAL_OBJECT.println(precockAffineOffsetMs);
 
     SERIAL_OBJECT.print("trigger button: ");
     SERIAL_OBJECT.println(triggerButton.isPressed());
@@ -457,37 +463,43 @@ void commandSetConfig(int nbArgs, char **args)
     if (strcmp(args[1], "vpa") == 0)
     {
       voltageProtectionAlertConfig = atof(args[2]);
-      EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADRESS, voltageProtectionAlertConfig);
+      EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADDRESS, voltageProtectionAlertConfig);
       serialReturnSuccess();
     }
     else if (strcmp(args[1], "vpc") == 0)
     {
       voltageProtectionCutoffConfig = atof(args[2]);
-      EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADRESS, voltageProtectionCutoffConfig);
+      EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADDRESS, voltageProtectionCutoffConfig);
       serialReturnSuccess();
     }
     else if (strcmp(args[1], "fm1rn") == 0)
     {
       fireMode1RoundsNumberConfig = atoi(args[2]);
-      EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADRESS, fireMode1RoundsNumberConfig);
+      EEPROM.put(EEPROM_FIREMODE_1_ROUNDS_NUMBER_ADDRESS, fireMode1RoundsNumberConfig);
       serialReturnSuccess();
     }
     else if (strcmp(args[1], "fm2rn") == 0)
     {
       fireMode2RoundsNumberConfig = atoi(args[2]);
-      EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADRESS, fireMode2RoundsNumberConfig);
+      EEPROM.put(EEPROM_FIREMODE_2_ROUNDS_NUMBER_ADDRESS, fireMode2RoundsNumberConfig);
       serialReturnSuccess();
     }
     else if (strcmp(args[1], "fm1c") == 0)
     {
       fireMode1CycleConfig = atoi(args[2]);
-      EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADRESS, fireMode1CycleConfig);
+      EEPROM.put(EEPROM_FIREMODE_1_CYCLE_ADDRESS, fireMode1CycleConfig);
       serialReturnSuccess();
     }
     else if (strcmp(args[1], "fm2c") == 0)
     {
       fireMode2CycleConfig = atoi(args[2]);
-      EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADRESS, fireMode2CycleConfig);
+      EEPROM.put(EEPROM_FIREMODE_2_CYCLE_ADDRESS, fireMode2CycleConfig);
+      serialReturnSuccess();
+    }
+    else if (strcmp(args[1], "pcdelay") == 0)
+    {
+      precockAffineOffsetMs = atoi(args[2]);
+      EEPROM.put(EEPROM_PRECOCK_AFFINE_OFFSET_MS_ADDRESS, precockAffineOffsetMs);
       serialReturnSuccess();
     }
     else
@@ -500,7 +512,16 @@ void commandSetConfig(int nbArgs, char **args)
     serialReturnFailure();
   }
 }
-
+void commandUncock(int nbArgs, char **args)
+{
+  if (nbArgs == 1)
+  {
+    uncock();
+    serialReturnSuccess();
+  }else{
+    serialReturnFailure();
+  }
+}
 void serialReturnFailure()
 {
   SERIAL_OBJECT.println("KO");
@@ -549,6 +570,14 @@ void displayFiremode()
     display.displayRaw((const uint8_t[]){B01101101, B01110111, B01110001, B01111001});
     break;
   }
+}
+
+void uncock()
+{
+    digitalWrite(MOTOR_PIN, HIGH);
+    tappetPlateSensorButton.waitForPress();
+    tappetPlateSensorButton.waitForRelease();
+    digitalWrite(MOTOR_PIN, LOW);
 }
 
 float getCurrentVoltage()
