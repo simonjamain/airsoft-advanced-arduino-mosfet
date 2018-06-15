@@ -1,6 +1,0 @@
-{
-    "board": "arduino:avr:nano",
-    "configuration": "cpu=atmega168",
-    "port": "COM6",
-    "sketch": "sketch_arduino.ino"
-}
