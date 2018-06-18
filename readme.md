@@ -51,6 +51,9 @@ Une version simple du circuit électronique est visible ici
 https://www.tinkercad.com/things/6ycemaio86j-arduino-mosfet
 à noter que la connexion du HC-06 et de l'afficheur 7-segments n'est pas détaillée.
 
+### matériel
+section à remplir
+
 ## Code arduino
 
 Le code arduino est disponible sur github à l’adresse suivante :
@@ -69,12 +72,25 @@ pour installer les bibliothèques manuellement, clonez les dépots dans votre do
 
 ## utilisation
 
+### première utilisation
+
+Avant le premier tir vous devez initialiser la configuration du mosfet.
+
+*section à compléter*
+
 ### modes de tir
-la configuration et l'uncocking via bluetooth sont disponible depuis tout les modes de tir.
+Le passage entre les différents modes de tir ce fait grâce a une pression sur le **multimodeButton**.
 
 - **SAFE** : détente désactivée
 - **MODE 1** : nombre de coups et type de cycle déterminé par configuration
 - **MODE 2** : nombre de coups et type de cycle déterminé par configuration
+
+la configuration et l'uncocking via bluetooth sont disponible depuis tout les modes de tir.
+
+### configuration (via bluetooth)
+*section à remplir*
+### precocking
+*section à remplir*
 
 ## améliorations futures
 
@@ -82,3 +98,6 @@ la configuration et l'uncocking via bluetooth sont disponible depuis tout les mo
 - retrait des bouts de codes concernant la detection du sélécteur de tir qui brouille le code (matériellement pas en place pour le moment)
 - réglage du nombre de modes de tir
   - gestion différente et plus dynamique des modes de tir
+- calcul automatique des meilleures valeures de precocking
+  - gestion intelligente des timings precocking en fonction du voltage ?
+- commande d'initialisation des config via bluetooth

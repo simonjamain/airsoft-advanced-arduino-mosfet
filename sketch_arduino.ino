@@ -216,7 +216,7 @@ void setup()
   uint8_t defaultFiremode2RoundsNumberConfig = 0;
   uint8_t defaultFiremode2CycleConfig = FIREMODE_CYCLE_CONFIG_STOP_IMMEDIATELY_ON_RELEASE; //no effect in full auto
 
-  uint8_t defaultPrecockAffineOffsetMs = 40;
+  uint8_t defaultPrecockAffineOffsetMs = 35;
 
   EEPROM.put(EEPROM_VOLTAGE_PROTECTION_ALERT_ADDRESS, defaultVoltageProtectionAlertConfig);
   EEPROM.put(EEPROM_VOLTAGE_PROTECTION_CUTOFF_ADDRESS, defaultVoltageProtectionCutoffConfig);
